@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word-by-Word Text Diff Comparator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .code-font { font-family: 'JetBrains Mono', monospace; }
+        /* Custom scrollbar for diff viewers */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 h-full flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30 px-4 lg:px-8 py-3.5 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-base font-semibold tracking-tight text-white flex items-center gap-2">
+                    DiffCraft <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Word Comparator</span>
+                </h1>
+                <p class="text-xs text-slate-400">Precise word-level text difference analyzer</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button onclick="loadSampleText()" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition border border-slate-700 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                Load Sample
+            </button>
+            <button onclick="clearAll()" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-rose-900/30 text-rose-400 transition border border-slate-700/80 hover:border-rose-800/50 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                Clear All
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 overflow-y-auto p-4 lg:p-6 max-w-7xl mx-auto w-full space-y-6">
+
+        <!-- Input Text Areas Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <!-- Original Text Box -->
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <label for="originalText" class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-rose-500"></span> Original Text
+                    </label>
+                    <div class="flex items-center space-x-1">
+                        <button onclick="pasteText('originalText')" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition text-xs flex items-center gap-1" title="Paste from clipboard">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                            Paste
+                        </button>
+                        <button onclick="clearText('originalText')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition text-xs" title="Clear text">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                </div>
+                <textarea id="originalText" oninput="triggerCompare()" rows="6" placeholder="Paste or type original text here..." class="w-full bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition resize-y"></textarea>
+                <div class="mt-2 flex justify-between items-center text-xs text-slate-500">
+                    <span id="origWordCount">0 words</span>
+                    <span>Supports multi-paragraph text</span>
+                </div>
+            </div>
+
+            <!-- Modified Text Box -->
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <label for="modifiedText" class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Modified Text
+                    </label>
+                    <div class="flex items-center space-x-1">
+                        <button onclick="pasteText('modifiedText')" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition text-xs flex items-center gap-1" title="Paste from clipboard">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                            Paste
+                        </button>
+                        <button onclick="clearText('modifiedText')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition text-xs" title="Clear text">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                </div>
+                <textarea id="modifiedText" oninput="triggerCompare()" rows="6" placeholder="Paste or type modified text here..." class="w-full bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition resize-y"></textarea>
+                <div class="mt-2 flex justify-between items-center text-xs text-slate-500">
+                    <span id="modWordCount">0 words</span>
+                    <span>Compares word-by-word instantly</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics Dashboard -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">
+                <span class="text-xs font-medium text-slate-400">Similarity Score</span>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <span id="metricSimilarity" class="text-2xl font-bold text-white">100%</span>
+                    <span id="similarityBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">Identical</span>
+                </div>
+            </div>
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">
+                <span class="text-xs font-medium text-slate-400">Words Added</span>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <span id="metricAdded" class="text-2xl font-bold text-emerald-400">0</span>
+                    <span class="text-xs text-slate-500">new words</span>
+                </div>
+            </div>
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">
+                <span class="text-xs font-medium text-slate-400">Words Deleted</span>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <span id="metricDeleted" class="text-2xl font-bold text-rose-400">0</span>
+                    <span class="text-xs text-slate-500">removed words</span>
+                </div>
+            </div>
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">
+                <span class="text-xs font-medium text-slate-400">Total Changes</span>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <span id="metricChanges" class="text-2xl font-bold text-indigo-400">0</span>
+                    <span class="text-xs text-slate-500">modifications</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Output Section with Tabs -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
+            <!-- Tabs & Legend Bar -->
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 border-b border-slate-800 gap-3 bg-slate-900">
+                <div class="flex items-center space-x-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    <button onclick="switchView('inline')" id="tabInline" class="px-3 py-1.5 text-xs font-medium rounded-lg transition text-white bg-indigo-600 shadow-sm">Inline Diff</button>
+                    <button onclick="switchView('side')" id="tabSide" class="px-3 py-1.5 text-xs font-medium rounded-lg transition text-slate-400 hover:text-white">Side-by-Side</button>
+                </div>
+                <!-- Legend -->
+                <div class="flex items-center space-x-4 text-xs font-medium">
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500/30"></span>
+                        <span class="text-slate-300">Added</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-3 h-3 rounded bg-rose-500/20 border border-rose-500/30"></span>
+                        <span class="text-slate-300">Deleted</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inline View Container -->
+            <div id="viewInlineContainer" class="p-5 overflow-x-auto max-h-[500px]">
+                <div id="inlineDiffOutput" class="text-sm leading-relaxed whitespace-pre-wrap font-sans text-slate-200">
+                    <!-- Rendered inline diff goes here -->
+                </div>
+            </div>
+
+            <!-- Side-by-Side View Container -->
+            <div id="viewSideContainer" class="hidden grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-800 max-h-[500px] overflow-y-auto">
+                <div class="p-4 overflow-x-auto">
+                    <div class="text-xs font-semibold text-rose-400 uppercase tracking-wider mb-3">Original View with Deletions</div>
+                    <div id="sideOriginalOutput" class="text-sm leading-relaxed whitespace-pre-wrap font-sans text-slate-200"></div>
+                </div>
+                <div class="p-4 overflow-x-auto">
+                    <div class="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-3">Modified View with Additions</div>
+                    <div id="sideModifiedOutput" class="text-sm leading-relaxed whitespace-pre-wrap font-sans text-slate-200"></div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer Toast / Notification message box -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-800 border border-slate-700 text-slate-200 px-4 py-2.5 rounded-xl shadow-2xl text-xs font-medium flex items-center gap-2">
+        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+        <span id="toastMessage">Action completed successfully.</span>
+    </div>
+
+    <!-- JavaScript Diff Engine & UI Controller -->
+    <script>
+        let currentView = 'inline';
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 2500);
+        }
+
+        function clearText(elementId) {
+            document.getElementById(elementId).value = '';
+            triggerCompare();
+            showToast('Cleared text area.');
+        }
+
+        function clearAll() {
+            document.getElementById('originalText').value = '';
+            document.getElementById('modifiedText').value = '';
+            triggerCompare();
+            showToast('Cleared all contents.');
+        }
+
+        async function pasteText(elementId) {
+            try {
+                const text = await navigator.clipboard.readText();
+                document.getElementById(elementId).value = text;
+                triggerCompare();
+                showToast('Pasted from clipboard successfully.');
+            } catch (err) {
+                showToast('Clipboard access denied or not supported.');
+            }
+        }
+
+        function loadSampleText() {
+            const origSample = "The quick brown fox jumps over the lazy dog.\nThis is the original version of the contract clause regarding intellectual property rights. All rights reserved by the publisher in 2025.\nPlease review carefully before submission.";
+            const modSample = "The fast brown fox jumps right over the lazy dog.\nThis is the updated version of the contract clause regarding intellectual property ownership. All rights reserved by the author in 2026.\nPlease review thoroughly before final submission.";
+            
+            document.getElementById('originalText').value = origSample;
+            document.getElementById('modifiedText').value = modSample;
+            triggerCompare();
+            showToast('Loaded sample text successfully.');
+        }
+
+        function switchView(view) {
+            currentView = view;
+            const tabInline = document.getElementById('tabInline');
+            const tabSide = document.getElementById('tabSide');
+            const viewInlineContainer = document.getElementById('viewInlineContainer');
+            const viewSideContainer = document.getElementById('viewSideContainer');
+
+            if (view === 'inline') {
+                tabInline.className = "px-3 py-1.5 text-xs font-medium rounded-lg transition text-white bg-indigo-600 shadow-sm";
+                tabSide.className = "px-3 py-1.5 text-xs font-medium rounded-lg transition text-slate-400 hover:text-white";
+                viewInlineContainer.classList.remove('hidden');
+                viewSideContainer.classList.add('hidden');
+            } else {
+                tabSide.className = "px-3 py-1.5 text-xs font-medium rounded-lg transition text-white bg-indigo-600 shadow-sm";
+                tabInline.className = "px-3 py-1.5 text-xs font-medium rounded-lg transition text-slate-400 hover:text-white";
+                viewSideContainer.classList.remove('hidden');
+                viewInlineContainer.classList.add('hidden');
+            }
+        }
+
+        // Tokenizer function to split text into words, punctuation, and whitespace
+        function tokenize(text) {
+            return text.match(/[\w]+|[^\w\s]|\s+/g) || [];
+        }
+
+        // Robust LCS-based Word Diff Engine
+        function computeWordDiff(text1, text2) {
+            const tokens1 = tokenize(text1);
+            const tokens2 = tokenize(text2);
+
+            // Update word counts for stats
+            const words1Count = tokens1.filter(t => /\w/.test(t)).length;
+            const words2Count = tokens2.filter(t => /\w/.test(t)).length;
+            document.getElementById('origWordCount').innerText = `${words1Count} words`;
+            document.getElementById('modWordCount').innerText = `${words2Count} words`;
+
+            const n = tokens1.length;
+            const m = tokens2.length;
+
+            // DP Table for Longest Common Subsequence
+            // To prevent memory overflow with extremely huge texts, handle gracefully or cap if needed
+            const dp = Array(n + 1).fill(0).map(() => Array(m + 1).fill(0));
+            
+            for (let i = 1; i <= n; i++) {
+                for (let j = 1; j <= m; j++) {
+                    if (tokens1[i - 1] === tokens2[j - 1]) {
+                        dp[i][j] = dp[i - 1][j - 1] + 1;
+                    } else {
+                        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                    }
+                }
+            }
+
+            // Backtrack to assemble edit operations
+            let i = n, j = m;
+            const ops = [];
+            while (i > 0 || j > 0) {
+                if (i > 0 && j > 0 && tokens1[i - 1] === tokens2[j - 1]) {
+                    ops.unshift({ type: 'equal', val: tokens1[i - 1] });
+                    i--; j--;
+                } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+                    ops.unshift({ type: 'insert', val: tokens2[j - 1] });
+                    j--;
+                } else if (i > 0 && (j === 0 || dp[i][j - 1] < dp[i - 1][j])) {
+                    ops.unshift({ type: 'delete', val: tokens1[i - 1] });
+                    i--;
+                }
+            }
+
+            return ops;
+        }
+
+        function triggerCompare() {
+            const text1 = document.getElementById('originalText').value;
+            const text2 = document.getElementById('modifiedText').value;
+
+            if (!text1 && !text2) {
+                document.getElementById('inlineDiffOutput').innerHTML = '<span class="text-slate-500 italic">Enter or paste text above to see word-by-word differences...</span>';
+                document.getElementById('sideOriginalOutput').innerHTML = '<span class="text-slate-500 italic">No text provided.</span>';
+                document.getElementById('sideModifiedOutput').innerHTML = '<span class="text-slate-500 italic">No text provided.</span>';
+                document.getElementById('metricSimilarity').innerText = '100%';
+                document.getElementById('similarityBadge').innerText = 'Identical';
+                document.getElementById('metricAdded').innerText = '0';
+                document.getElementById('metricDeleted').innerText = '0';
+                document.getElementById('metricChanges').innerText = '0';
+                return;
+            }
+
+            const ops = computeWordDiff(text1, text2);
+
+            let inlineHTML = '';
+            let sideOrigHTML = '';
+            let sideModHTML = '';
+
+            let addedCount = 0;
+            let deletedCount = 0;
+            let equalCount = 0;
+
+            ops.forEach(op => {
+                const isWord = /\w/.test(op.val);
+                
+                if (op.type === 'equal') {
+                    if (isWord) equalCount++;
+                    const escaped = escapeHtml(op.val);
+                    inlineHTML += escaped;
+                    sideOrigHTML += escaped;
+                    sideModHTML += escaped;
+                } else if (op.type === 'delete') {
+                    if (isWord) deletedCount++;
+                    const escaped = escapeHtml(op.val);
+                    inlineHTML += `<span class="bg-rose-500/20 text-rose-300 line-through px-0.5 rounded border border-rose-500/30">${escaped}</span>`;
+                    sideOrigHTML += `<span class="bg-rose-500/20 text-rose-300 line-through px-0.5 rounded border border-rose-500/30">${escaped}</span>`;
+                } else if (op.type === 'insert') {
+                    if (isWord) addedCount++;
+                    const escaped = escapeHtml(op.val);
+                    inlineHTML += `<span class="bg-emerald-500/20 text-emerald-300 px-0.5 rounded border border-emerald-500/30 font-medium">${escaped}</span>`;
+                    sideModHTML += `<span class="bg-emerald-500/20 text-emerald-300 px-0.5 rounded border border-emerald-500/30 font-medium">${escaped}</span>`;
+                }
+            });
+
+            document.getElementById('inlineDiffOutput').innerHTML = inlineHTML;
+            document.getElementById('sideOriginalOutput').innerHTML = sideOrigHTML;
+            document.getElementById('sideModifiedOutput').innerHTML = sideModHTML;
+
+            // Metrics calculation
+            const totalWords = equalCount + Math.max(addedCount, deletedCount);
+            let similarity = totalWords === 0 ? 100 : Math.round((equalCount / (equalCount + addedCount + deletedCount)) * 100);
+            if (isNaN(similarity)) similarity = 100;
+
+            document.getElementById('metricSimilarity').innerText = `${similarity}%`;
+            document.getElementById('metricAdded').innerText = addedCount;
+            document.getElementById('metricDeleted').innerText = deletedCount;
+            document.getElementById('metricChanges').innerText = addedCount + deletedCount;
+
+            const badge = document.getElementById('similarityBadge');
+            if (similarity === 100) {
+                badge.className = "text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium";
+                badge.innerText = "Identical";
+            } else if (similarity > 80) {
+                badge.className = "text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-medium";
+                badge.innerText = "Minor Edits";
+            } else {
+                badge.className = "text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-medium";
+                badge.innerText = "Major Edits";
+            }
+        }
+
+        function escapeHtml(str) {
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Initialize empty state on load
+        window.onload = function() {
+            triggerCompare();
+        };
+    </script>
+</body>
+</html>
